@@ -226,14 +226,19 @@ def edit_diary(logged_in_user):
         print(f"제목: {diary['Title']}, 날짜: {diary['Date']}, 날씨: {diary['Weather']}, 기분: {diary['Mood']}")
         print("내용:", diary['Content'])
 
+        # 사용자 입력이 빈 문자열이면 원래 값으로 유지
         new_title = input("\n새로운 제목을 입력하세요 (변경하지 않을 경우 엔터): ")
+        new_title = new_title if new_title != "" else diary['Title']
+
         new_content = input("새로운 내용을 입력하세요 (변경하지 않을 경우 엔터): ")
+        new_content = new_content if new_content != "" else diary['Content']
 
         # update_diary 함수 호출 시 logged_in_user, diary_id, new_title, new_content를 전달
         update_diary(logged_in_user, int(diary_id), new_title, new_content)
         print("다이어리가 성공적으로 수정되었습니다.")
     else:
         print("해당 ID의 다이어리가 존재하지 않습니다.")
+
 
 
 def delete_diary(logged_in_user):
