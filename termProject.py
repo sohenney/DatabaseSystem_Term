@@ -137,9 +137,9 @@ def create_diary(logged_in_user):
     if not selected_category:
         return
 
-    date = input("날짜를 입력하세요: ")
-    weather = input("날씨를 입력하세요: ")
-    mood = input("기분을 입력하세요: ")
+    date = input("오늘의 날짜는 무엇인가요?: ")
+    weather = input("오늘의 날씨는 어땠나요?: ")
+    mood = input("오늘 기분은 어땠나요?: ")
     content = input("내용을 입력하세요: ")
     title = input("다이어리의 제목을 입력하세요: ")
 
@@ -295,6 +295,7 @@ while True:
     print("""
     MyDiary 프로그램에 접속하신 걸 환영합니다!
     ** 해당 프로그램은 회원가입 후에 이용 가능합니다. **
+
     """)
     print("1. 회원가입\n2. 로그인\n3. 회원탈퇴\n4. 종료")
     choice = input("선택하세요: ")
@@ -306,11 +307,15 @@ while True:
         if logged_in_user:
             while True:
                 print("""
+
+
                 다이어리 및 카테고리 관리 화면입니다.
+
                 *********************************************
                 카테고리가 존재해야 다이어리 작성이 가능합니다.
-                기본 카테고리는 일기가 있으며, 5을 입력해 추가 가능합니다. 
+                카테고리는 5을 입력해 추가 가능합니다. 
                 *********************************************
+
                 1. 다이어리 작성
                 2. 다이어리 조회
                 3. 다이어리 수정
@@ -318,6 +323,7 @@ while True:
                 5. 카테고리 추가
                 6. 카테고리 삭제
                 7. 로그아웃
+
                 """)
                 diary_choice = input("원하는 작업을 선택하세요: ")
                 if diary_choice == "1":
@@ -339,7 +345,6 @@ while True:
                     delete_category(logged_in_user)
                     pass
                 elif diary_choice == "7":
-                    # 로그아웃 기능 추가
                     break
                 else:
                     print("올바른 선택이 아닙니다. 다시 선택하세요.")
