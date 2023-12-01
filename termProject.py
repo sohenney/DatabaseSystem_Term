@@ -93,6 +93,12 @@ def fetch_user_diaries(logged_in_user):
     return cursor.fetchall()
 
 def fetch_diary_by_id(logged_in_user, diary_id):
+    try:
+        diary_id = int(diary_id)  # 입력받은 diary_id를 정수형으로 변환
+    except ValueError:
+        print("다이어리 ID는 숫자여야 합니다.")
+        return None
+
     # 특정 ID의 다이어리 조회
     cursor.execute("""
         SELECT Title, Date, Weather, Mood, Content
@@ -100,7 +106,20 @@ def fetch_diary_by_id(logged_in_user, diary_id):
         WHERE DiaryID = ? AND UserID = ?
     """, diary_id, logged_in_user.UserID)
 
-    return cursor.fetchone()
+    row = cursor.fetchone()
+
+    if row:
+        # Access tuple elements using integer indices
+        diary = {
+            'Title': row[0],
+            'Date': row[1],
+            'Weather': row[2],
+            'Mood': row[3],
+            'Content': row[4]
+        }
+        return diary
+    else:
+        return None
 
 def update_diary(logged_in_user, diary_id, new_title, new_content):
     user_diaries = fetch_user_diaries(logged_in_user)
@@ -137,7 +156,7 @@ def create_diary(logged_in_user):
     if not selected_category:
         return
 
-    date = input("오늘의 날짜는 무엇인가요?: ")
+    date = input("오늘의 날짜는 무엇인가요? (ex. 2023.11.30): ")
     weather = input("오늘의 날씨는 어땠나요?: ")
     mood = input("오늘 기분은 어땠나요?: ")
     content = input("내용을 입력하세요: ")
@@ -151,10 +170,11 @@ def view_diaries(logged_in_user):
     if not user_diaries:
         print("데이터가 없습니다.")
         return
-    
+
     print("\n사용자의 다이어리 목록:")
     for diary in user_diaries:
-        print(f"다이어리 ID: {diary.DiaryID}, 제목: {diary.Title}, 날짜: {diary.Date}")
+        # diary는 튜플이므로, 각 요소에 숫자 인덱스로 접근
+        print(f"다이어리 ID: {diary[0]}, 제목: {diary[1]}, 날짜: {diary[2]}")
 
     selected_diary_id = input("\n자세히 조회할 다이어리의 ID를 입력하세요 (취소하려면 엔터): ")
 
@@ -162,14 +182,16 @@ def view_diaries(logged_in_user):
         diary = fetch_diary_by_id(logged_in_user, selected_diary_id)
         if diary:
             print("\n다이어리 정보:")
-            print(f"제목: {diary.Title}, 날짜: {diary.Date}, 날씨: {diary.Weather}, 기분: {diary.Mood}")
-            print("내용:", diary.Content)
+            print(f"제목: {diary['Title']}, 날짜: {diary['Date']}, 날씨: {diary['Weather']}, 기분: {diary['Mood']}")
+            print("내용:", diary['Content'])
 
             ok_input = input("\nOK를 입력하면 다이어리 및 카테고리 관리 화면으로 돌아갑니다: ")
             if ok_input.lower() == "ok":
                 return
         else:
             print("해당 ID의 다이어리가 존재하지 않습니다.")
+
+
 
 def edit_diary(logged_in_user):
     user_diaries = fetch_user_diaries(logged_in_user)
@@ -178,7 +200,14 @@ def edit_diary(logged_in_user):
         print("데이터가 없습니다.")
         return
 
-    diary_id = input("수정할 다이어리의 ID를 입력하세요: ")
+    print("\n사용자의 다이어리 목록:")
+    for diary in user_diaries:
+        print(f"다이어리 ID: {diary[0]}, 제목: {diary[1]}, 날짜: {diary[2]}")
+
+    diary_id = input("\n수정할 다이어리의 ID를 입력하세요 (취소하려면 엔터): ")
+
+    if not diary_id:
+        return
 
     # 입력받은 diary_id가 숫자인지 확인
     if not diary_id.isdigit():
@@ -190,8 +219,8 @@ def edit_diary(logged_in_user):
 
     if diary:
         print("\n다이어리 정보:")
-        print(f"제목: {diary.Title}, 날짜: {diary.Date}, 날씨: {diary.Weather}, 기분: {diary.Mood}")
-        print("내용:", diary.Content)
+        print(f"제목: {diary['Title']}, 날짜: {diary['Date']}, 날씨: {diary['Weather']}, 기분: {diary['Mood']}")
+        print("내용:", diary['Content'])
 
         new_title = input("\n새로운 제목을 입력하세요 (변경하지 않을 경우 엔터): ")
         new_content = input("새로운 내용을 입력하세요 (변경하지 않을 경우 엔터): ")
@@ -209,18 +238,22 @@ def delete_diary(logged_in_user):
     if not user_diaries:
         print("데이터가 없습니다.")
         return
-        
+
+    print("\n사용자의 다이어리 목록:")
+    for diary in user_diaries:
+        print(f"다이어리 ID: {diary[0]}, 제목: {diary[1]}, 날짜: {diary[2]}")
+
     diary_id = input("삭제할 다이어리의 ID를 입력하세요: ")
-    diary = fetch_diary_by_id(diary_id)
+    diary = fetch_diary_by_id(logged_in_user, diary_id)
     
     if diary:
         print("\n다이어리 정보:")
-        print(f"제목: {diary.Title}, 날짜: {diary.Date}, 날씨: {diary.Weather}, 기분: {diary.Mood}")
-        print("내용:", diary.Content)
+        print(f"제목: {diary.get('Title')}, 날짜: {diary.get('Date')}, 날씨: {diary.get('Weather')}, 기분: {diary.get('Mood')}")
+        print("내용:", diary.get('Content'))
 
         confirmation = input("\n정말로 삭제하시겠습니까? (y/n): ")
         if confirmation.lower() == "y":
-            delete_diary_by_id(diary_id)
+            delete_diary_by_id(logged_in_user, diary_id)  # diary_id를 전달
             print("다이어리가 성공적으로 삭제되었습니다.")
         else:
             print("다이어리 삭제가 취소되었습니다.")
