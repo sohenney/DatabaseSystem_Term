@@ -1,5 +1,8 @@
 import pyodbc
 
+# 현재 로그인한 사용자 정보를 저장할 변수
+current_user = None
+
 # 회원관리
 def user_exists(username):
     cursor.execute("SELECT COUNT(*) FROM User WHERE Username = ?", username)
@@ -22,6 +25,7 @@ def register_user():
     print("회원가입이 완료되었습니다. 로그인하세요.")
 
 def login_user():
+    global current_user
     print("로그인을 시작합니다.")
     username = input("계정명을 입력하세요: ")
 
@@ -36,6 +40,7 @@ def login_user():
     user = cursor.fetchone()
 
     if user:
+        current_user = user  # 현재 로그인한 사용자 정보 저장
         print("로그인 성공! 환영합니다, {}님.".format(username))
         return user
     else:
@@ -59,7 +64,7 @@ def delete_user(username, password):
 # 다이어리 관리
 def insert_diary(user_id, category_name, date, weather, mood, content, title):
     # 카테고리 ID 가져오기
-    cursor.execute("SELECT CategoryID FROM Category WHERE CategoryName = ?", category_name)
+    cursor.execute("SELECT CategoryID FROM Category WHERE CategoryName = ? AND UserID = ?", category_name, user_id)
     category_row = cursor.fetchone()
 
     if category_row:
@@ -75,66 +80,61 @@ def insert_diary(user_id, category_name, date, weather, mood, content, title):
 
         print("다이어리가 성공적으로 추가되었습니다.")
     else:
-        print(f"카테고리 '{category_name}'가 존재하지 않습니다.")
+        print(f"카테고리 '{category_name}'가 존재하지 않거나 권한이 없습니다.")
 
-
-def fetch_user_diaries(user_id):
+def fetch_user_diaries(logged_in_user):
     # 사용자의 다이어리 조회
     cursor.execute("""
         SELECT DiaryID, Title, Date, Weather, Mood, Content
         FROM Diary
         WHERE UserID = ?
-    """, user_id)
-    
+    """, logged_in_user.UserID)
+
     return cursor.fetchall()
 
-def fetch_diary_by_id(diary_id):
+def fetch_diary_by_id(logged_in_user, diary_id):
     # 특정 ID의 다이어리 조회
     cursor.execute("""
         SELECT Title, Date, Weather, Mood, Content
         FROM Diary
-        WHERE DiaryID = ?
-    """, diary_id)
+        WHERE DiaryID = ? AND UserID = ?
+    """, diary_id, logged_in_user.UserID)
 
     return cursor.fetchone()
 
-def update_diary(diary_id, new_title, new_content):
+def update_diary(logged_in_user, diary_id, new_title, new_content):
+    user_diaries = fetch_user_diaries(logged_in_user)
+
     # 다이어리 업데이트
     cursor.execute("""
         UPDATE Diary
         SET Title = ?, Content = ?
-        WHERE DiaryID = ?
-    """, new_title, new_content, diary_id)
+        WHERE DiaryID = ? AND UserID = ?
+    """, new_title, new_content, diary_id, logged_in_user.UserID)
+
+    if not user_diaries:
+        print("데이터가 없습니다.")
     
     conn.commit()
 
-def delete_diary_by_id(diary_id):
-    # 다이어리 삭제
-    cursor.execute("DELETE FROM Diary WHERE DiaryID = ?", diary_id)
+def delete_diary_by_id(logged_in_user, diary_id):
+    user_diaries = fetch_user_diaries(logged_in_user)
     
+    # 다이어리 삭제
+    cursor.execute("""
+        DELETE FROM Diary
+        WHERE DiaryID = ? AND UserID = ?
+    """, diary_id, logged_in_user.UserID)
+    
+    if not user_diaries:
+        print("데이터가 없습니다.")
+
     conn.commit()
 
 def create_diary(logged_in_user):
-    # Display a list of available categories
-    cursor.execute("SELECT CategoryName FROM Category")
-    categories = [row.CategoryName for row in cursor.fetchall()]
-    
-    if not categories:
-        print("카테고리가 존재하지 않습니다. 먼저 카테고리를 추가하세요.")
-        return
+    selected_category = select_category(logged_in_user)
 
-    print("다이어리의 카테고리를 선택하세요:")
-    for i, category in enumerate(categories, start=1):
-        print(f"{i}. {category}")
-
-    # Get user's category choice
-    category_choice = input("선택하세요 (숫자): ")
-
-    try:
-        category_index = int(category_choice) - 1
-        selected_category = categories[category_index]
-    except (ValueError, IndexError):
-        print("올바른 선택이 아닙니다. 다이어리 작성을 취소합니다.")
+    if not selected_category:
         return
 
     date = input("날짜를 입력하세요: ")
@@ -144,16 +144,49 @@ def create_diary(logged_in_user):
     title = input("다이어리의 제목을 입력하세요: ")
 
     insert_diary(logged_in_user.UserID, selected_category, date, weather, mood, content, title)
-    
+
 def view_diaries(logged_in_user):
-    user_diaries = fetch_user_diaries(logged_in_user.UserID)
+    user_diaries = fetch_user_diaries(logged_in_user)
+
+    if not user_diaries:
+        print("데이터가 없습니다.")
+        return
+    
     print("\n사용자의 다이어리 목록:")
     for diary in user_diaries:
         print(f"다이어리 ID: {diary.DiaryID}, 제목: {diary.Title}, 날짜: {diary.Date}")
 
+    selected_diary_id = input("\n자세히 조회할 다이어리의 ID를 입력하세요 (취소하려면 엔터): ")
+
+    if selected_diary_id:
+        diary = fetch_diary_by_id(logged_in_user, selected_diary_id)
+        if diary:
+            print("\n다이어리 정보:")
+            print(f"제목: {diary.Title}, 날짜: {diary.Date}, 날씨: {diary.Weather}, 기분: {diary.Mood}")
+            print("내용:", diary.Content)
+
+            ok_input = input("\nOK를 입력하면 다이어리 및 카테고리 관리 화면으로 돌아갑니다: ")
+            if ok_input.lower() == "ok":
+                return
+        else:
+            print("해당 ID의 다이어리가 존재하지 않습니다.")
+
 def edit_diary(logged_in_user):
+    user_diaries = fetch_user_diaries(logged_in_user)
+
+    if not user_diaries:
+        print("데이터가 없습니다.")
+        return
+
     diary_id = input("수정할 다이어리의 ID를 입력하세요: ")
-    diary = fetch_diary_by_id(diary_id)
+
+    # 입력받은 diary_id가 숫자인지 확인
+    if not diary_id.isdigit():
+        print("다이어리 ID는 숫자여야 합니다.")
+        return
+
+    # fetch_diary_by_id 함수 호출 시 logged_in_user와 diary_id를 전달
+    diary = fetch_diary_by_id(logged_in_user, int(diary_id))
 
     if diary:
         print("\n다이어리 정보:")
@@ -163,15 +196,23 @@ def edit_diary(logged_in_user):
         new_title = input("\n새로운 제목을 입력하세요 (변경하지 않을 경우 엔터): ")
         new_content = input("새로운 내용을 입력하세요 (변경하지 않을 경우 엔터): ")
 
-        update_diary(diary_id, new_title, new_content)
+        # update_diary 함수 호출 시 logged_in_user, diary_id, new_title, new_content를 전달
+        update_diary(logged_in_user, int(diary_id), new_title, new_content)
         print("다이어리가 성공적으로 수정되었습니다.")
     else:
         print("해당 ID의 다이어리가 존재하지 않습니다.")
 
+
 def delete_diary(logged_in_user):
+    user_diaries = fetch_user_diaries(logged_in_user)
+
+    if not user_diaries:
+        print("데이터가 없습니다.")
+        return
+        
     diary_id = input("삭제할 다이어리의 ID를 입력하세요: ")
     diary = fetch_diary_by_id(diary_id)
-
+    
     if diary:
         print("\n다이어리 정보:")
         print(f"제목: {diary.Title}, 날짜: {diary.Date}, 날씨: {diary.Weather}, 기분: {diary.Mood}")
@@ -186,18 +227,17 @@ def delete_diary(logged_in_user):
     else:
         print("해당 ID의 다이어리가 존재하지 않습니다.")
 
-# 카테고리 관리
-def add_category():
+def add_category(logged_in_user):
     print("새로운 카테고리를 추가합니다.")
     new_category = input("추가할 카테고리의 이름을 입력하세요: ")
 
-    cursor.execute("INSERT INTO Category (CategoryName) VALUES (?)", new_category)
+    cursor.execute("INSERT INTO Category (CategoryName, UserID) VALUES (?, ?)", new_category, logged_in_user.UserID)
     conn.commit()
 
     print(f"카테고리 '{new_category}'가 성공적으로 추가되었습니다.")
 
-def select_category():
-    cursor.execute("SELECT CategoryName FROM Category")
+def select_category(logged_in_user):
+    cursor.execute("SELECT CategoryName FROM Category WHERE UserID = ?", logged_in_user.UserID)
     categories = [row.CategoryName for row in cursor.fetchall()]
 
     if not categories:
@@ -218,18 +258,20 @@ def select_category():
         print("올바른 선택이 아닙니다.")
         return None
 
-def delete_category():
-    selected_category = select_category()
+def delete_category(logged_in_user):
+    selected_category = select_category(logged_in_user)
 
     if selected_category:
         confirmation = input(f"정말로 카테고리 '{selected_category}'를 삭제하시겠습니까? (y/n): ")
 
         if confirmation.lower() == "y":
-            cursor.execute("DELETE FROM Category WHERE CategoryName = ?", selected_category)
+            cursor.execute("DELETE FROM Category WHERE CategoryName = ? AND UserID = ?", selected_category, logged_in_user.UserID)
             conn.commit()
             print(f"카테고리 '{selected_category}'가 성공적으로 삭제되었습니다.")
         else:
             print("카테고리 삭제가 취소되었습니다.")
+
+
 
 # PyODBC 연결 문자열 생성
 conn_str = (
@@ -246,6 +288,7 @@ conn = pyodbc.connect(conn_str)
 
 # 커서 생성
 cursor = conn.cursor()
+
 
 # 사용자에게 회원가입, 로그인, 탈퇴 선택
 while True:
@@ -273,9 +316,8 @@ while True:
                 3. 다이어리 수정
                 4. 다이어리 삭제
                 5. 카테고리 추가
-                6. 카테고리 선택
-                7. 카테고리 삭제
-                6. 로그아웃
+                6. 카테고리 삭제
+                7. 로그아웃
                 """)
                 diary_choice = input("원하는 작업을 선택하세요: ")
                 if diary_choice == "1":
@@ -291,15 +333,12 @@ while True:
                     delete_diary(logged_in_user)
                     pass
                 elif diary_choice == "5":
-                    add_category()
+                    add_category(logged_in_user)
                     pass
                 elif diary_choice == "6":
-                    select_category()
+                    delete_category(logged_in_user)
                     pass
                 elif diary_choice == "7":
-                    delete_category()
-                    break
-                elif diary_choice == "8":
                     # 로그아웃 기능 추가
                     break
                 else:
