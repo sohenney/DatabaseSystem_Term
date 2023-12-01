@@ -186,6 +186,51 @@ def delete_diary(logged_in_user):
     else:
         print("해당 ID의 다이어리가 존재하지 않습니다.")
 
+# 카테고리 관리
+def add_category():
+    print("새로운 카테고리를 추가합니다.")
+    new_category = input("추가할 카테고리의 이름을 입력하세요: ")
+
+    cursor.execute("INSERT INTO Category (CategoryName) VALUES (?)", new_category)
+    conn.commit()
+
+    print(f"카테고리 '{new_category}'가 성공적으로 추가되었습니다.")
+
+def select_category():
+    cursor.execute("SELECT CategoryName FROM Category")
+    categories = [row.CategoryName for row in cursor.fetchall()]
+
+    if not categories:
+        print("등록된 카테고리가 없습니다. 먼저 카테고리를 추가하세요.")
+        return None
+
+    print("다이어리의 카테고리를 선택하세요:")
+    for i, category in enumerate(categories, start=1):
+        print(f"{i}. {category}")
+
+    category_choice = input("선택하세요 (숫자): ")
+
+    try:
+        category_index = int(category_choice) - 1
+        selected_category = categories[category_index]
+        return selected_category
+    except (ValueError, IndexError):
+        print("올바른 선택이 아닙니다.")
+        return None
+
+def delete_category():
+    selected_category = select_category()
+
+    if selected_category:
+        confirmation = input(f"정말로 카테고리 '{selected_category}'를 삭제하시겠습니까? (y/n): ")
+
+        if confirmation.lower() == "y":
+            cursor.execute("DELETE FROM Category WHERE CategoryName = ?", selected_category)
+            conn.commit()
+            print(f"카테고리 '{selected_category}'가 성공적으로 삭제되었습니다.")
+        else:
+            print("카테고리 삭제가 취소되었습니다.")
+
 # PyODBC 연결 문자열 생성
 conn_str = (
     r'DRIVER={MySQL ODBC 8.2 Unicode Driver};'
@@ -246,13 +291,13 @@ while True:
                     delete_diary(logged_in_user)
                     pass
                 elif diary_choice == "5":
-                    # 카테고리 추가 기능 추가
+                    add_category()
                     pass
                 elif diary_choice == "6":
-                    # 카테고리 선택 기능 추가
+                    select_category()
                     pass
                 elif diary_choice == "7":
-                    # 카테고리 삭제 기능 추가
+                    delete_category()
                     break
                 elif diary_choice == "8":
                     # 로그아웃 기능 추가
