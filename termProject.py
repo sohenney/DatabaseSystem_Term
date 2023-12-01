@@ -52,6 +52,10 @@ def delete_user(username, password):
     user = cursor.fetchone()
 
     if user:
+        # 해당 사용자에게 속한 다이어리 및 카테고리 삭제
+        cursor.execute("DELETE FROM Diary WHERE UserID = ?", user.UserID)
+        cursor.execute("DELETE FROM Category WHERE UserID = ?", user.UserID)
+
         # 사용자 정보 삭제
         cursor.execute("DELETE FROM User WHERE UserID = ?", user.UserID)
         conn.commit()
